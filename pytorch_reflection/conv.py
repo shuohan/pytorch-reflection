@@ -187,7 +187,9 @@ class _LRConvF2F(torch.nn.Module):
             bias = self.bias.repeat(2)
             bias = bias.view(1, -1, *np.ones(len(self.kernel_size), dtype=int))
             output = output + bias
-        return output
+        weight1.retain_grad()
+        weight2.retain_grad()
+        return output, weight1, weight2
 
     def _conv(self, input, weight, stride, padding):
         raise NotImplementedError
