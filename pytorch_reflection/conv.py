@@ -46,6 +46,11 @@ def interleave_out_channels(weight1, weight2):
     return weight
 
 
+def interleave_bias(bias):
+    bias = torch.stack((bias, bias), dim=1).view(-1)
+    return bias
+
+
 class _LRConvI2F(torch.nn.Module):
     """Left-right reflection equivariant convolution from image to feature maps.
 
@@ -102,7 +107,7 @@ class _LRConvI2F(torch.nn.Module):
         weight = concat_weights_I2F(self.weight)
         output = self._conv(input, weight, self.stride, self.padding)
         if self.bias is not None:
-            bias = interleave_out_channels(self.bias, self.bias)
+            bias = interleave_bias(self.bias)
             bias = bias.view(1, -1, *np.ones(len(self.kernel_size), dtype=int))
             output = output + bias
         return output
@@ -216,7 +221,7 @@ class _LRConvF2F(torch.nn.Module):
         weight = concat_weights_F2F(self.weight1, self.weight2)
         output = self._conv(input, weight, self.stride, self.padding)
         if self.bias is not None:
-            bias = interleave_out_channels(self.bias, self.bias)
+            bias = interleave_bias(self.bias)
             bias = bias.view(1, -1, *np.ones(len(self.kernel_size), dtype=int))
             output = output + bias
         return output

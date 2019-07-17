@@ -14,19 +14,19 @@ from pytorch_reflection.norm import LRInstanceNorm2d, LRBatchNorm2d
 class Net1(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.conv1 = LRConvI2F2d(in_channels, 2, 3, padding=1, use_bias=False)
+        self.conv1 = LRConvI2F2d(in_channels, 2, 3, padding=1, use_bias=True)
         # self.norm1 = LRInstanceNorm2d(2, affine=True)
         # self.norm1 = LRBatchNorm2d(2, affine=True)
         # self.dp1 = torch.nn.Dropout2d(0.2)
-        self.conv2 = LRConvF2F2d(2, 4, 3, padding=1, use_bias=False)
+        self.conv2 = LRConvF2F2d(2, 4, 3, padding=1, use_bias=True)
         # self.norm2 = LRInstanceNorm2d(4, affine=True)
         # self.norm2 = LRBatchNorm2d(4, affine=True)
         # self.dp2 = torch.nn.Dropout2d(0.2)
-        self.conv3 = LRConvF2F2d(4, 8, 3, padding=1, use_bias=False)
+        self.conv3 = LRConvF2F2d(4, 8, 3, padding=1, use_bias=True)
         # self.norm3 = LRInstanceNorm2d(8, affine=True)
         # self.norm3 = LRBatchNorm2d(8, affine=True)
         # self.dp3 = torch.nn.Dropout2d(0.2)
-        self.conv4 = LRConvF2I2d(8, out_channels, 3, padding=1, use_bias=False)
+        self.conv4 = LRConvF2I2d(8, out_channels, 3, padding=1, use_bias=True)
 
     def forward(self, input):
         output = self.conv1(input)
@@ -96,7 +96,6 @@ for i in range(num_iters):
     loss = loss_fn(output1, y0)
     optimizer.zero_grad()
     loss.backward()
-    print(net1.conv4.weight1)
     optimizer.step()
 
 net1 = net1.eval()
@@ -106,7 +105,6 @@ output1_r = net1(flipped_data).detach().numpy()
 diff1 = np.abs(output1[:, :, ::-1, ...] - output1_r[:, :, ...])
 diff1_tmp = diff1 / output1_r
 diff1_tmp = diff1_tmp[np.logical_not(np.isnan(diff1_tmp))]
-print(np.max(diff1_tmp))
 
 plt.figure()
 plt.subplot(3, 2, 1)
@@ -142,7 +140,6 @@ output2_r = net2(flipped_data).detach().numpy()
 diff2 = np.abs(output2[:, :, ::-1, ...] - output2_r[:, :, ...])
 diff2_tmp = diff2 / output2_r
 diff2_tmp = diff2_tmp[np.logical_not(np.isnan(diff2_tmp))]
-print(np.max(diff2_tmp))
 
 plt.figure()
 plt.subplot(3, 2, 1)
@@ -154,7 +151,6 @@ plt.imshow(flipped_data[0, ...].squeeze(), cmap='gray')
 plt.subplot(3, 2, 4)
 plt.imshow(output2_r[0, ...].squeeze(), cmap='gray')
 plt.subplot(3, 2, 5)
-print(diff2.shape)
 plt.imshow(diff2[0, ...].squeeze())
 text = 'max abs diff %.2e\nmax relative diff %.2e\noutput intensity [%.2e, %.2e]'
 text = text %  (np.max(diff2), np.max(diff2_tmp), np.min(output2), np.max(output2))
