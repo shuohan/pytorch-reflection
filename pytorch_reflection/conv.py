@@ -6,6 +6,46 @@ import numpy as np
 import math
 
 
+def concat_weights_I2F(weight):
+    flipped_weight = torch.flip(weight, dims=(2, )) # first spatial dim
+    weight = interleave_out_channels(weight, flipped_weight)
+    return weight
+
+
+def concat_weights_F2F(weight1, weight2):
+    flipped_weight1 = torch.flip(weight1, dims=(2, )) # first spatial dim
+    flipped_weight2 = torch.flip(weight2, dims=(2, )) # first spatial dim
+    w1 = interleave_in_channels(weight1, weight2)
+    w2 = interleave_in_channels(flipped_weight2, flipped_weight1)
+    weight = interleave_out_channels(w1, w2)
+    return weight
+
+
+def concat_weights_F2I(weight1, weight2):
+    flipped_weight1 = torch.flip(weight1, dims=(2, )) # first spatial dim
+    flipped_weight2 = torch.flip(weight2, dims=(2, )) # first spatial dim
+    w1 = interleave_in_channels(weight1, weight2)
+    w2 = interleave_in_channels(flipped_weight2, flipped_weight1)
+    weight = w1 + w2
+    return weight
+
+
+def interleave_in_channels(weight1, weight2):
+    out_channels = weight1.shape[0]
+    spatial_dims = weight1.shape[2:]
+    weight = torch.stack((weight1, weight2), dim=2)
+    weight = weight.view(out_channels, -1, *spatial_dims)
+    return weight
+
+
+def interleave_out_channels(weight1, weight2):
+    in_channels = weight1.shape[1]
+    spatial_dims = weight1.shape[2:]
+    weight = torch.stack((weight1, weight2), dim=1)
+    weight = weight.view(-1, in_channels, *spatial_dims)
+    return weight
+
+
 class _LRConvI2F(torch.nn.Module):
     """Left-right reflection equivariant convolution from image to feature maps.
 
@@ -59,12 +99,10 @@ class _LRConvI2F(torch.nn.Module):
         return s.format(**self.__dict__)
 
     def forward(self, input):
-        indices = np.arange(self.kernel_size[0] - 1, -1, -1)
-        flipped_weight = self.weight[:, :, indices, ...]
-        weight = torch.cat((self.weight, flipped_weight), 0)
+        weight = concat_weights_I2F(self.weight)
         output = self._conv(input, weight, self.stride, self.padding)
         if self.bias is not None:
-            bias = self.bias.repeat(2)
+            bias = interleave_out_channels(self.bias, self.bias)
             bias = bias.view(1, -1, *np.ones(len(self.kernel_size), dtype=int))
             output = output + bias
         return output
@@ -148,8 +186,8 @@ class _LRConvF2F(torch.nn.Module):
         self.use_bias = use_bias
 
         weight1 = torch.Tensor(out_channels, in_channels, *kernel_size)
-        self.weight1 = torch.nn.Parameter(weight1)
         weight2 = torch.Tensor(out_channels, in_channels, *kernel_size)
+        self.weight1 = torch.nn.Parameter(weight1)
         self.weight2 = torch.nn.Parameter(weight2)
         if self.use_bias:
             self.bias = torch.nn.Parameter(torch.Tensor(out_channels))
@@ -175,21 +213,13 @@ class _LRConvF2F(torch.nn.Module):
         return s.format(**self.__dict__)
 
     def forward(self, input):
-        indices = np.arange(self.kernel_size[0] - 1, -1, -1)
-        flipped_weight1 = self.weight1[:, :, indices, ...]
-        flipped_weight2 = self.weight2[:, :, indices, ...]
-        weight1 = torch.cat((self.weight1, self.weight2), 1)
-        weight2 = torch.cat((flipped_weight2, flipped_weight1), 1)
-        output1 = self._conv(input, weight1, self.stride, self.padding)
-        output2 = self._conv(input, weight2, self.stride, self.padding)
-        output = torch.cat((output1, output2), 1)
+        weight = concat_weights_F2F(self.weight1, self.weight2)
+        output = self._conv(input, weight, self.stride, self.padding)
         if self.bias is not None:
-            bias = self.bias.repeat(2)
+            bias = interleave_out_channels(self.bias, self.bias)
             bias = bias.view(1, -1, *np.ones(len(self.kernel_size), dtype=int))
             output = output + bias
-        weight1.retain_grad()
-        weight2.retain_grad()
-        return output, weight1, weight2
+        return output
 
     def _conv(self, input, weight, stride, padding):
         raise NotImplementedError
@@ -257,8 +287,8 @@ class _LRConvF2I(torch.nn.Module):
         self.use_bias = use_bias
 
         weight1 = torch.Tensor(out_channels, in_channels, *kernel_size)
-        self.weight1 = torch.nn.Parameter(weight1)
         weight2 = torch.Tensor(out_channels, in_channels, *kernel_size)
+        self.weight1 = torch.nn.Parameter(weight1)
         self.weight2 = torch.nn.Parameter(weight2)
         if self.use_bias:
             self.bias = torch.nn.Parameter(torch.Tensor(out_channels))
@@ -284,19 +314,11 @@ class _LRConvF2I(torch.nn.Module):
         return s.format(**self.__dict__)
 
     def forward(self, input):
-        indices = np.arange(self.kernel_size[0] - 1, -1, -1)
-        flipped_weight1 = self.weight1[:, :, indices, ...]
-        flipped_weight2 = self.weight2[:, :, indices, ...]
-        weight1 = torch.cat((self.weight1, self.weight2), 1)
-        weight2 = torch.cat((flipped_weight2, flipped_weight1), 1)
-        output1 = self._conv(input, weight1, self.stride, self.padding)
-        output2 = self._conv(input, weight2, self.stride, self.padding)
-        output = torch.cat((output1, output2), 1)
+        weight = concat_weights_F2I(self.weight1, self.weight2)
+        output = self._conv(input, weight, self.stride, self.padding)
         if self.bias is not None:
-            bias = self.bias.repeat(2)
-            bias = bias.view(1, -1, *np.ones(len(self.kernel_size), dtype=int))
+            bias = self.bias.view(1, -1, *np.ones(len(self.kernel_size), dtype=int))
             output = output + bias
-        output = output1 + output2
         return output
 
 
