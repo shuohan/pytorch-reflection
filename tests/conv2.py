@@ -18,28 +18,28 @@ class Net1(torch.nn.Module):
         super().__init__()
         self.conv1 = LRConvI2F2d(in_channels, 2, 3, padding=1, use_bias=True)
         self.norm1 = Norm(2, affine=True)
-        # self.dp1 = torch.nn.Dropout2d(0.2)
+        self.dp1 = torch.nn.Dropout2d(0.2)
         self.conv2 = LRConvF2F2d(2, 4, 3, padding=1, use_bias=True)
         self.norm2 = Norm(4, affine=True)
-        # self.dp2 = torch.nn.Dropout2d(0.2)
+        self.dp2 = torch.nn.Dropout2d(0.2)
         self.conv3 = LRConvF2F2d(4, 8, 3, padding=1, use_bias=True)
         self.norm3 = Norm(8, affine=True)
-        # self.dp3 = torch.nn.Dropout2d(0.2)
+        self.dp3 = torch.nn.Dropout2d(0.2)
         self.conv4 = LRConvF2I2d(8, out_channels, 3, padding=1, use_bias=True)
 
     def forward(self, input):
         output = self.conv1(input)
         output = self.norm1(output)
         output = relu(output)
-        # output = self.dp1(output)
+        output = self.dp1(output)
         output = self.conv2(output)
         output = self.norm2(output)
         output = relu(output)
-        # output = self.dp2(output)
+        output = self.dp2(output)
         output = self.conv3(output)
         output = self.norm3(output)
         output = relu(output)
-        # output = self.dp3(output)
+        output = self.dp3(output)
         output = self.conv4(output)
         return output
 
@@ -49,28 +49,34 @@ class Net2(torch.nn.Module):
         super().__init__()
         self.conv1 = torch.nn.Conv2d(in_channels, 4, 3, padding=1, bias=False)
         self.norm1 = torch.nn.BatchNorm2d(4)
+        self.dp1 = torch.nn.Dropout2d(0.2)
         self.conv2 = torch.nn.Conv2d(4, 8, 3, padding=1, bias=False)
         self.norm2 = torch.nn.BatchNorm2d(8)
+        self.dp2 = torch.nn.Dropout2d(0.2)
         self.conv3 = torch.nn.Conv2d(8, 16, 3, padding=1, bias=False)
         self.norm3 = torch.nn.BatchNorm2d(16)
+        self.dp3 = torch.nn.Dropout2d(0.2)
         self.conv4 = torch.nn.Conv2d(16, out_channels, 3, padding=1)
 
     def forward(self, input):
         output = self.conv1(input)
         output = self.norm1(output)
         output = relu(output)
+        output = self.dp1(output)
         output = self.conv2(output)
         output = self.norm2(output)
         output = relu(output)
+        output = self.dp2(output)
         output = self.conv3(output)
         output = self.norm3(output)
         output = relu(output)
+        output = self.dp3(output)
         output = self.conv4(output)
         return output
 
 num_iters = 1
 filename = 'image.nii.gz'
-data = nib.load(filename).get_data()
+data = nib.load(filename).get_data().T
 slice_ind1 = 100
 slice_ind2 = 125
 data1 = torch.from_numpy(data[..., slice_ind1]).float()[None, None, ...]
@@ -115,7 +121,6 @@ plt.imshow(diff1[0, ...].squeeze())
 text = 'max abs diff %.2e\nmax relative diff %.2e\noutput intensity [%.2e, %.2e]'
 text = text %  (np.max(diff1), np.max(diff1_tmp), np.min(output1), np.max(output1))
 plt.gcf().text(.5, .01, text, ha='center')
-
 
 net2 = Net2(1, 1)
 loss_fn = torch.nn.MSELoss()

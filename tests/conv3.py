@@ -19,25 +19,31 @@ class Net1(torch.nn.Module):
         super().__init__()
         self.conv1 = LRConvI2F3d(in_channels, 2, 3, padding=1)
         self.norm1 = Norm(2, affine=affine)
+        self.dp1 = torch.nn.Dropout3d(0.2)
         # self.norm1 = torch.nn.GroupNorm(2, 2 * 2, affine=True)
         self.conv2 = LRConvF2F3d(2, 4, 3, padding=1)
         self.norm2 = Norm(4, affine=affine)
         # self.norm2 = torch.nn.GroupNorm(4, 2 * 4, affine=True)
+        self.dp2 = torch.nn.Dropout3d(0.2)
         self.conv3 = LRConvF2F3d(4, 8, 3, padding=1)
         self.norm3 = Norm(8, affine=affine)
         # self.norm3 = torch.nn.GroupNorm(8, 2 * 8, affine=True)
+        self.dp3 = torch.nn.Dropout3d(0.2)
         self.conv4 = LRConvF2I3d(8, out_channels, 3, padding=1)
 
     def forward(self, input):
         output = self.conv1(input)
         output = self.norm1(output)
         output = relu(output)
+        output = self.dp1(output)
         output = self.conv2(output)
         output = self.norm2(output)
         output = relu(output)
+        output = self.dp2(output)
         output = self.conv3(output)
         output = self.norm3(output)
         output = relu(output)
+        output = self.dp3(output)
         output = self.conv4(output)
         return output
 
@@ -47,41 +53,47 @@ class Net2(torch.nn.Module):
         super().__init__()
         self.conv1 = torch.nn.Conv3d(in_channels, 4, 3, padding=1)
         self.norm1 = torch.nn.BatchNorm3d(4)
+        self.dp1 = torch.nn.Dropout3d(0.2)
         self.conv2 = torch.nn.Conv3d(4, 8, 3, padding=1)
         self.norm2 = torch.nn.BatchNorm3d(8)
+        self.dp2 = torch.nn.Dropout3d(0.2)
         self.conv3 = torch.nn.Conv3d(8, 16, 3, padding=1)
         self.norm3 = torch.nn.BatchNorm3d(16)
+        self.dp3 = torch.nn.Dropout3d(0.2)
         self.conv4 = torch.nn.Conv3d(16, out_channels, 3, padding=1)
 
     def forward(self, input):
         output = self.conv1(input)
         output = self.norm1(output)
         output = relu(output)
+        output = self.dp1(output)
         output = self.conv2(output)
         output = self.norm2(output)
         output = relu(output)
+        output = self.dp2(output)
         output = self.conv3(output)
         output = self.norm3(output)
         output = relu(output)
+        output = self.dp3(output)
         output = self.conv4(output)
         return output
 
 
 filename = 'image.nii.gz'
-data = np.abs(nib.load(filename).get_data())
+data = np.abs(nib.load(filename).get_data()).T
 data = (data / 1000).astype(int)
 data = torch.from_numpy(data).float()[None, None, ...].cuda()
 # data = torch.arange(27).float().view(1, 1, 3, 3, 3).cuda()
 flipped_data = data.flip(2)
 
-net1 = Net1(1, 1).cuda()
+net1 = Net1(1, 1).cuda().eval()
 output1 = net1(data).detach().cpu().numpy()
 output1_r = net1(flipped_data).detach().cpu().numpy()
 diff1 = np.abs(output1[:, :, ::-1, ...] - output1_r)
 diff1_tmp = diff1 / output1_r
 diff1_tmp = diff1_tmp[np.logical_not(np.isnan(diff1_tmp))]
 
-net2 = Net2(1, 1).cuda()
+net2 = Net2(1, 1).cuda().eval()
 output2 = net2(data).detach().cpu().numpy()
 output2_r = net2(flipped_data).cpu().detach().numpy()
 diff2 = np.abs(output2[:, :, ::-1, ...] - output2_r)
