@@ -11,21 +11,21 @@ from pytorch_reflection.conv import LRConvI2F3d, LRConvF2F3d, LRConvF2I3d
 from pytorch_reflection.norm import LRInstanceNorm3d, LRBatchNorm3d
 
 
-Norm = LRInstanceNorm3d
+Norm = LRBatchNorm3d
 affine = True 
 
 class Net1(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.conv1 = LRConvI2F3d(in_channels, 2, 3, padding=1)
+        self.conv1 = LRConvI2F3d(in_channels, 2, 3, padding=1, bias=False)
         self.norm1 = Norm(2, affine=affine)
         self.dp1 = torch.nn.Dropout3d(0.2)
         # self.norm1 = torch.nn.GroupNorm(2, 2 * 2, affine=True)
-        self.conv2 = LRConvF2F3d(2, 4, 3, padding=1)
+        self.conv2 = LRConvF2F3d(2, 4, 3, padding=1, bias=False)
         self.norm2 = Norm(4, affine=affine)
         # self.norm2 = torch.nn.GroupNorm(4, 2 * 4, affine=True)
         self.dp2 = torch.nn.Dropout3d(0.2)
-        self.conv3 = LRConvF2F3d(4, 8, 3, padding=1)
+        self.conv3 = LRConvF2F3d(4, 8, 3, padding=1, bias=False)
         self.norm3 = Norm(8, affine=affine)
         # self.norm3 = torch.nn.GroupNorm(8, 2 * 8, affine=True)
         self.dp3 = torch.nn.Dropout3d(0.2)
@@ -51,13 +51,13 @@ class Net1(torch.nn.Module):
 class Net2(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.conv1 = torch.nn.Conv3d(in_channels, 4, 3, padding=1)
+        self.conv1 = torch.nn.Conv3d(in_channels, 4, 3, padding=1, bias=False)
         self.norm1 = torch.nn.BatchNorm3d(4)
         self.dp1 = torch.nn.Dropout3d(0.2)
-        self.conv2 = torch.nn.Conv3d(4, 8, 3, padding=1)
+        self.conv2 = torch.nn.Conv3d(4, 8, 3, padding=1, bias=False)
         self.norm2 = torch.nn.BatchNorm3d(8)
         self.dp2 = torch.nn.Dropout3d(0.2)
-        self.conv3 = torch.nn.Conv3d(8, 16, 3, padding=1)
+        self.conv3 = torch.nn.Conv3d(8, 16, 3, padding=1, bias=False)
         self.norm3 = torch.nn.BatchNorm3d(16)
         self.dp3 = torch.nn.Dropout3d(0.2)
         self.conv4 = torch.nn.Conv3d(16, out_channels, 3, padding=1)
@@ -80,7 +80,7 @@ class Net2(torch.nn.Module):
 
 
 filename = 'image.nii.gz'
-data = np.abs(nib.load(filename).get_data()).T
+data = np.abs(nib.load(filename).get_data())
 data = (data / 1000).astype(int)
 data = torch.from_numpy(data).float()[None, None, ...].cuda()
 # data = torch.arange(27).float().view(1, 1, 3, 3, 3).cuda()

@@ -69,7 +69,7 @@ class _LRConvI2F(torch.nn.Module):
 
     """
     def __init__(self, in_channels, out_channels, kernel_size,
-                 stride=1, padding=0, padding_mode='zeros', use_bias=True):
+                 stride=1, padding=0, padding_mode='zeros', bias=True):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -77,11 +77,10 @@ class _LRConvI2F(torch.nn.Module):
         self.stride = stride
         self.padding = padding
         self.padding_mode = padding_mode
-        self.use_bias = use_bias
 
         weight = torch.Tensor(out_channels, in_channels, *kernel_size)
         self.weight = torch.nn.Parameter(weight)
-        if self.use_bias:
+        if bias:
             self.bias = torch.nn.Parameter(torch.Tensor(out_channels))
         else:
             self.register_parameter('bias', None)
@@ -89,7 +88,7 @@ class _LRConvI2F(torch.nn.Module):
 
     def reset_parameters(self):
         torch.nn.init.kaiming_uniform_(self.weight, a=math.sqrt(5))
-        if self.use_bias:
+        if self.bias is not None:
             fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(self.weight)
             bound = 1 / math.sqrt(fan_in)
             torch.nn.init.uniform_(self.bias, -bound, bound)
@@ -126,12 +125,12 @@ class LRConvI2F2d(_LRConvI2F):
 
     """
     def __init__(self, in_channels, out_channels, kernel_size,
-                 stride=1, padding=0, padding_mode='zeros', use_bias=True):
+                 stride=1, padding=0, padding_mode='zeros', bias=True):
         kernel_size = torch.nn.modules.utils._pair(kernel_size)
         stride = torch.nn.modules.utils._pair(stride)
         padding = torch.nn.modules.utils._pair(padding)
         super().__init__(in_channels, out_channels, kernel_size, stride,
-                         padding, padding_mode, use_bias)
+                         padding, padding_mode, bias)
 
     def _conv(self, in_channels, weight, stride, padding):
         return F.conv2d(in_channels, weight, stride=stride, padding=padding)
@@ -147,12 +146,12 @@ class LRConvI2F3d(_LRConvI2F):
 
     """
     def __init__(self, in_channels, out_channels, kernel_size,
-                 stride=1, padding=0, padding_mode='zeros', use_bias=True):
+                 stride=1, padding=0, padding_mode='zeros', bias=True):
         kernel_size = torch.nn.modules.utils._triple(kernel_size)
         stride = torch.nn.modules.utils._triple(stride)
         padding = torch.nn.modules.utils._triple(padding)
         super().__init__(in_channels, out_channels, kernel_size, stride,
-                         padding, padding_mode, use_bias)
+                         padding, padding_mode, bias)
 
     def _conv(self, in_channels, weight, stride, padding):
         return F.conv3d(in_channels, weight, stride=stride, padding=padding)
@@ -180,7 +179,7 @@ class _LRConvF2F(torch.nn.Module):
 
     """
     def __init__(self, in_channels, out_channels, kernel_size,
-                 stride=1, padding=0, padding_mode='zeros', use_bias=True):
+                 stride=1, padding=0, padding_mode='zeros', bias=True):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -188,13 +187,12 @@ class _LRConvF2F(torch.nn.Module):
         self.stride = stride
         self.padding = padding
         self.padding_mode = padding_mode
-        self.use_bias = use_bias
 
         weight1 = torch.Tensor(out_channels, in_channels, *kernel_size)
         weight2 = torch.Tensor(out_channels, in_channels, *kernel_size)
         self.weight1 = torch.nn.Parameter(weight1)
         self.weight2 = torch.nn.Parameter(weight2)
-        if self.use_bias:
+        if bias:
             self.bias = torch.nn.Parameter(torch.Tensor(out_channels))
         else:
             self.register_parameter('bias', None)
@@ -203,7 +201,7 @@ class _LRConvF2F(torch.nn.Module):
     def reset_parameters(self):
         torch.nn.init.kaiming_uniform_(self.weight1, a=math.sqrt(5))
         torch.nn.init.kaiming_uniform_(self.weight2, a=math.sqrt(5))
-        if self.use_bias:
+        if self.bias is not None:
             fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(self.weight1)
             bound = 1 / math.sqrt(fan_in)
             torch.nn.init.uniform_(self.bias, -bound, bound)
@@ -240,12 +238,12 @@ class LRConvF2F2d(_LRConvF2F):
 
     """
     def __init__(self, in_channels, out_channels, kernel_size,
-                 stride=1, padding=0, padding_mode='zeros', use_bias=True):
+                 stride=1, padding=0, padding_mode='zeros', bias=True):
         kernel_size = torch.nn.modules.utils._pair(kernel_size)
         stride = torch.nn.modules.utils._pair(stride)
         padding = torch.nn.modules.utils._pair(padding)
         super().__init__(in_channels, out_channels, kernel_size, stride,
-                         padding, padding_mode, use_bias)
+                         padding, padding_mode, bias)
 
     def _conv(self, in_channels, weight, stride, padding):
         return F.conv2d(in_channels, weight, stride=stride, padding=padding)
@@ -261,12 +259,12 @@ class LRConvF2F3d(_LRConvF2F):
 
     """
     def __init__(self, in_channels, out_channels, kernel_size,
-                 stride=1, padding=0, padding_mode='zeros', use_bias=True):
+                 stride=1, padding=0, padding_mode='zeros', bias=True):
         kernel_size = torch.nn.modules.utils._triple(kernel_size)
         stride = torch.nn.modules.utils._triple(stride)
         padding = torch.nn.modules.utils._triple(padding)
         super().__init__(in_channels, out_channels, kernel_size, stride,
-                         padding, padding_mode, use_bias)
+                         padding, padding_mode, bias)
 
     def _conv(self, in_channels, weight, stride, padding):
         return F.conv3d(in_channels, weight, stride=stride, padding=padding)
@@ -281,7 +279,7 @@ class _LRConvF2I(torch.nn.Module):
 
     """
     def __init__(self, in_channels, out_channels, kernel_size,
-                 stride=1, padding=0, padding_mode='zeros', use_bias=True):
+                 stride=1, padding=0, padding_mode='zeros', bias=True):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
@@ -289,13 +287,12 @@ class _LRConvF2I(torch.nn.Module):
         self.stride = stride
         self.padding = padding
         self.padding_mode = padding_mode
-        self.use_bias = use_bias
 
         weight1 = torch.Tensor(out_channels, in_channels, *kernel_size)
         weight2 = torch.Tensor(out_channels, in_channels, *kernel_size)
         self.weight1 = torch.nn.Parameter(weight1)
         self.weight2 = torch.nn.Parameter(weight2)
-        if self.use_bias:
+        if bias:
             self.bias = torch.nn.Parameter(torch.Tensor(out_channels))
         else:
             self.register_parameter('bias', None)
@@ -304,7 +301,7 @@ class _LRConvF2I(torch.nn.Module):
     def reset_parameters(self):
         torch.nn.init.kaiming_uniform_(self.weight1, a=math.sqrt(5))
         torch.nn.init.kaiming_uniform_(self.weight2, a=math.sqrt(5))
-        if self.use_bias:
+        if self.bias is not None:
             fan_in, _ = torch.nn.init._calculate_fan_in_and_fan_out(self.weight1)
             bound = 1 / math.sqrt(fan_in)
             torch.nn.init.uniform_(self.bias, -bound, bound)
@@ -337,12 +334,12 @@ class LRConvF2I2d(_LRConvF2I):
 
     """
     def __init__(self, in_channels, out_channels, kernel_size,
-                 stride=1, padding=0, padding_mode='zeros', use_bias=True):
+                 stride=1, padding=0, padding_mode='zeros', bias=True):
         kernel_size = torch.nn.modules.utils._pair(kernel_size)
         stride = torch.nn.modules.utils._pair(stride)
         padding = torch.nn.modules.utils._pair(padding)
         super().__init__(in_channels, out_channels, kernel_size, stride,
-                         padding, padding_mode, use_bias)
+                         padding, padding_mode, bias)
 
     def _conv(self, in_channels, weight, stride, padding):
         return F.conv2d(in_channels, weight, stride=stride, padding=padding)
@@ -358,12 +355,12 @@ class LRConvF2I3d(_LRConvF2I):
 
     """
     def __init__(self, in_channels, out_channels, kernel_size,
-                 stride=1, padding=0, padding_mode='zeros', use_bias=True):
+                 stride=1, padding=0, padding_mode='zeros', bias=True):
         kernel_size = torch.nn.modules.utils._triple(kernel_size)
         stride = torch.nn.modules.utils._triple(stride)
         padding = torch.nn.modules.utils._triple(padding)
         super().__init__(in_channels, out_channels, kernel_size, stride,
-                         padding, padding_mode, use_bias)
+                         padding, padding_mode, bias)
 
     def _conv(self, in_channels, weight, stride, padding):
         return F.conv3d(in_channels, weight, stride=stride, padding=padding)

@@ -16,16 +16,16 @@ Norm = LRInstanceNorm2d
 class Net1(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.conv1 = LRConvI2F2d(in_channels, 2, 3, padding=1, use_bias=True)
+        self.conv1 = LRConvI2F2d(in_channels, 2, 3, padding=1, bias=True)
         self.norm1 = Norm(2, affine=True)
         self.dp1 = torch.nn.Dropout2d(0.2)
-        self.conv2 = LRConvF2F2d(2, 4, 3, padding=1, use_bias=True)
+        self.conv2 = LRConvF2F2d(2, 4, 3, padding=1, bias=True)
         self.norm2 = Norm(4, affine=True)
         self.dp2 = torch.nn.Dropout2d(0.2)
-        self.conv3 = LRConvF2F2d(4, 8, 3, padding=1, use_bias=True)
+        self.conv3 = LRConvF2F2d(4, 8, 3, padding=1, bias=True)
         self.norm3 = Norm(8, affine=True)
         self.dp3 = torch.nn.Dropout2d(0.2)
-        self.conv4 = LRConvF2I2d(8, out_channels, 3, padding=1, use_bias=True)
+        self.conv4 = LRConvF2I2d(8, out_channels, 3, padding=1, bias=True)
 
     def forward(self, input):
         output = self.conv1(input)
@@ -74,7 +74,7 @@ class Net2(torch.nn.Module):
         output = self.conv4(output)
         return output
 
-num_iters = 1
+num_iters = 10
 filename = 'image.nii.gz'
 data = nib.load(filename).get_data().T
 slice_ind1 = 100
