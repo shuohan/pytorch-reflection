@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
   
 import torch
-from pytorch_engine.layers import create_pool
+from pytorch_engine.layers import create_pool, create_proj
 
 from .blocks import LRInputBlock, LRContractingBlock, LRExpandingBlock
-from .blocks import create_LRF2I, LRTransUpBlock
+from .blocks import create_LRF2I, LRTransUpBlock, TransUpBlock
+from .blocks import InputBlock, ContractingBlock, ExpandingBlock
 
 
 class _UNet(torch.nn.Module):
@@ -103,16 +104,16 @@ class LRUNet(_UNet):
 
 class UNet(_UNet):
     def _create_ib(self, in_channels, out_channels, inter_channels):
-        return LRInputBlock(in_channels, out_channels, inter_channels)
+        return InputBlock(in_channels, out_channels, inter_channels)
     
     def _create_cb(self, in_channels, out_channels, inter_channels):
-        return LRContractingBlock(in_channels, out_channels, inter_channels)
+        return ContractingBlock(in_channels, out_channels, inter_channels)
 
     def _create_tu(self, in_channels, out_channels):
-        return LRTransUpBlock(in_channels, out_channels)
+        return TransUpBlock(in_channels, out_channels)
 
     def _create_eb(self, in_channels, shortcut_channels, out_channels):
-        return LRExpandingBlock(in_channels, shortcut_channels, out_channels)
+        return ExpandingBlock(in_channels, shortcut_channels, out_channels)
 
     def _create_out(self, in_channels):
-        return create_LRF2I(in_channels, self.out_classes)
+        return create_proj(in_channels, self.out_classes)

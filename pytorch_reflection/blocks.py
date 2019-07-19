@@ -9,6 +9,7 @@ import torch
 from pytorch_engine import Config as EConfig
 from pytorch_engine.layers import create_activ, create_dropout
 from pytorch_engine.layers import create_interpolate, create_norm
+from pytorch_engine.layers import create_three_conv, create_proj
 
 
 def create_LRI2F(in_channels, out_channels, **kwargs):
@@ -59,16 +60,19 @@ def create_LR_norm(num_features):
             return LRBatchNorm3d(num_features, **paras)
 
 
-class LRConvBlock(torch.nn.Module):
+class _ConvBlock(torch.nn.Module):
     def __init__(self, in_channels, out_channels, **kwargs):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.conv = self._create_conv()
-        self.norm = create_LR_norm(out_channels)
+        self.norm = self._create_norm()
         self.activ = create_activ()
 
     def _create_conv(self):
+        raise NotImplementedError
+
+    def _create_norm(self):
         raise NotImplementedError
 
     def forward(self, input):
@@ -78,55 +82,122 @@ class LRConvBlock(torch.nn.Module):
         return output
 
 
-class LRConvBlockI2F(LRConvBlock):
+class _LRConvBlock(_ConvBlock):
+    def _create_norm(self):
+        return create_LR_norm(self.out_channels)
+
+
+class ConvBlock(_ConvBlock):
+    def _create_conv(self):
+        return create_three_conv(self.in_channels, self.out_channels,bias=False)
+
+    def _create_norm(self):
+        return create_norm(self.out_channels)
+
+
+class LRConvBlockI2F(_LRConvBlock):
     def _create_conv(self):
         return create_LRI2F(self.in_channels, self.out_channels, bias=False)
 
 
-class LRConvBlockF2F(LRConvBlock):
+class LRConvBlockF2F(_LRConvBlock):
     def _create_conv(self):
         return create_LRF2F(self.in_channels, self.out_channels, bias=False)
 
 
-class LRInputBlock(torch.nn.Module):
+class _InputBlock(torch.nn.Module):
+
     def __init__(self, in_channels, out_channels, inter_channels):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.inter_channels = inter_channels
-        self.conv1 = LRConvBlockI2F(in_channels, inter_channels)
+        self.conv1 = self._create_conv1()
         self.dp1 = create_dropout()
-        self.conv2 = LRConvBlockF2F(inter_channels, out_channels)
+        self.conv2 = self._create_conv2()
         self.dp2 = create_dropout()
 
     def forward(self, input):
+        # print('ib input', input.shape)
         output = self.conv1(input)
+        # print('ib after conv1', output.shape)
         output = self.dp1(output)
         output = self.conv2(output)
+        # print('ib after conv2', output.shape)
         output = self.dp2(output)
         return output
 
+    def _create_conv1(self):
+        raise NotImplementedError
 
-class LRContractingBlock(torch.nn.Module):
+    def _create_conv2(self):
+        raise NotImplementedError
+
+
+class InputBlock(_InputBlock):
+
+    def _create_conv1(self):
+        return ConvBlock(self.in_channels, self.inter_channels)
+
+    def _create_conv2(self):
+        return ConvBlock(self.inter_channels, self.out_channels)
+
+
+class LRInputBlock(_InputBlock):
+
+    def _create_conv1(self):
+        return LRConvBlockI2F(self.in_channels, self.inter_channels)
+
+    def _create_conv2(self):
+        return LRConvBlockF2F(self.inter_channels, self.out_channels)
+
+
+class _ContractingBlock(torch.nn.Module):
+
     def __init__(self, in_channels, out_channels, inter_channels):
         super().__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.inter_channels = inter_channels
-        self.conv1 = LRConvBlockF2F(in_channels, inter_channels)
+        self.conv1 = self._create_conv1()
         self.dp1 = create_dropout()
-        self.conv2 = LRConvBlockF2F(inter_channels, out_channels)
+        self.conv2 = self._create_conv2()
         self.dp2 = create_dropout()
         
     def forward(self, input):
+        # print('cb input', input.shape)
         output = self.conv1(input)
+        # print('cb after conv1', output.shape)
         output = self.dp1(output)
         output = self.conv2(output)
+        # print('cb after conv2', output.shape)
         output = self.dp2(output)
         return output
 
+    def _create_conv1(self):
+        raise NotImplementedError
 
-class LRExpandingBlock(torch.nn.Module):
+    def _create_conv2(self):
+        raise NotImplementedError
+
+
+class ContractingBlock(_ContractingBlock):
+    def _create_conv1(self):
+        return ConvBlock(self.in_channels, self.inter_channels)
+
+    def _create_conv2(self):
+        return ConvBlock(self.inter_channels, self.out_channels)
+
+
+class LRContractingBlock(_ContractingBlock):
+    def _create_conv1(self):
+        return LRConvBlockF2F(self.in_channels, self.inter_channels)
+
+    def _create_conv2(self):
+        return LRConvBlockF2F(self.inter_channels, self.out_channels)
+
+
+class _ExpandingBlock(torch.nn.Module):
     def __init__(self, in_channels, shortcut_channels, out_channels):
         super().__init__()
         self.in_channels = in_channels
@@ -134,25 +205,57 @@ class LRExpandingBlock(torch.nn.Module):
         self.shortcut_channels = shortcut_channels
 
         in_channels = in_channels + shortcut_channels
-        self.conv1 = LRConvBlockF2F(in_channels, out_channels)
+        self.conv1 = self._create_conv1()
         self.dp1 = create_dropout()
-        self.conv2 = LRConvBlockF2F(out_channels, out_channels)
+        self.conv2 = self._create_conv2()
         self.dp2 = create_dropout()
 
     def forward(self, input, shortcut):
+        # print('eb input', input.shape)
+        # print('eb shortcut', shortcut.shape)
         output = torch.cat((input, shortcut), dim=1) # concat channels
         output = self.conv1(output)
+        # print('eb after conv1', output.shape)
         output = self.dp1(output)
         output = self.conv2(output)
+        # print('eb after conv2', output.shape)
         output = self.dp2(output)
         return output
 
+    def _create_conv1(self):
+        raise NotImplementedError
 
-class LRTransUpBlock(torch.nn.Module):
+    def _create_conv2(self):
+        raise NotImplementedError
+
+
+class ExpandingBlock(_ExpandingBlock):
+
+    def _create_conv1(self):
+        in_channels = self.in_channels + self.shortcut_channels
+        return ConvBlock(in_channels, self.out_channels)
+
+    def _create_conv2(self):
+        return ConvBlock(self.out_channels, self.out_channels)
+
+
+class LRExpandingBlock(_ExpandingBlock):
+
+    def _create_conv1(self):
+        in_channels = self.in_channels + self.shortcut_channels
+        return LRConvBlockF2F(in_channels, self.out_channels)
+
+    def _create_conv2(self):
+        return LRConvBlockF2F(self.out_channels, self.out_channels)
+
+
+class _TransUpBlock(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
         super().__init__()
-        self.conv = create_LRF2F_proj(in_channels, out_channels, bias=False)
-        self.norm = create_LR_norm(out_channels)
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.conv = self._create_conv()
+        self.norm = self._create_norm()
         self.activ = create_activ()
         self.up = create_interpolate(scale_factor=2)
 
@@ -162,3 +265,27 @@ class LRTransUpBlock(torch.nn.Module):
         output = self.activ(output)
         output = self.up(output)
         return output
+
+    def _create_conv(self):
+        raise NotImplementedError
+
+    def _create_norm(self):
+        raise NotImplementedError
+
+
+class TransUpBlock(_TransUpBlock):
+
+    def _create_conv(self):
+        return create_proj(self.in_channels, self.out_channels, bias=False)
+
+    def _create_norm(self):
+        return create_norm(self.out_channels)
+
+
+class LRTransUpBlock(_TransUpBlock):
+
+    def _create_conv(self):
+        return create_LRF2F_proj(self.in_channels, self.out_channels,bias=False)
+
+    def _create_norm(self):
+        return create_LR_norm(self.out_channels)
