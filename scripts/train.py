@@ -58,6 +58,12 @@ parser.add_argument('-ls', '--label-suffix', default='label',
                     help='The suffix of the label image file.')
 parser.add_argument('-ms', '--mask-suffix', default='mask',
                     help='The suffix of the mask image file.')
+parser.add_argument('-vp', '--validation-period', type=int, default=1,
+                    help='The epoch period of validation')
+parser.add_argument('-pp', '--pred-saving-period', type=int, default=1,
+                    help='Save the prediction every this number of epochs')
+parser.add_argument('-ss', '--separate-samples', default=False,
+                    action='store_true', help='Print loss separately')
 
 args = parser.parse_args()
 
@@ -76,6 +82,7 @@ from dataset.pipelines import RandomPipeline
 from pytorch_engine import Config as EngineConfig
 from pytorch_engine.training import BasicLogger, Printer, ModelSaver
 from pytorch_engine.training import SimpleTrainer, SimpleValidator
+from pytorch_engine.training import PredictionSaver
 from pytorch_engine.funcs import count_trainable_paras
 from pytorch_engine.loss import create_loss
 
@@ -108,6 +115,8 @@ for key, value in config.items():
     setattr(args, key, value)
 config = args.__dict__
 
+engine_config.decimals = 8
+engine_config.eval_separate = args.separate_samples
 dataset_config.verbose = args.verbose
 dataset_config.aug_prob = args.augmentation_prob
 dataset_config.crop_shape = args.cropping_shape
@@ -204,8 +213,8 @@ print(optimizer)
 num_batches = len(t_dataset) // args.batch_size \
             + ((len(t_dataset) % args.batch_size) > 0)
 # trainer
-trainer = SimpleTrainer(net, loss_func, optimizer, num_epochs=args.num_epochs,
-                        num_batches=num_batches, data_loader=t_loader)
+trainer = SimpleTrainer(net, loss_func, optimizer, t_loader,
+                        num_epochs=args.num_epochs)
 printer = Printer('training')
 trainer.register_observer(printer)
 saver = ModelSaver(args.saving_period, args.output_prefix,
@@ -213,16 +222,23 @@ saver = ModelSaver(args.saving_period, args.output_prefix,
 trainer.register_observer(saver)
 t_logger = BasicLogger(args.output_prefix + 'training.csv')
 trainer.register_observer(t_logger)
+tsaver = PredictionSaver(args.pred_saving_period, args.output_prefix+'tra_')
+trainer.register_observer(tsaver)
 
 # validator
 if len(v_dataset) > 0:
     v_loader = DataLoader(v_dataset, batch_size=args.batch_size, shuffle=False,
                           num_workers=args.num_workers)
-    validator = SimpleValidator(v_loader, num_batches=num_batches)
+    validator = SimpleValidator(v_loader, saving_period=args.validation_period)
+
     v_printer = Printer('validation')
     v_logger = BasicLogger(args.output_prefix + 'validation.csv')
+
+    vsaver = PredictionSaver(args.pred_saving_period, args.output_prefix+'val_')
     validator.register_observer(v_logger)
     validator.register_observer(v_printer)
+    validator.register_observer(vsaver)
+
     trainer.register_observer(validator)
 
 # print configurations
