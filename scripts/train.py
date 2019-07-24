@@ -160,7 +160,6 @@ if 'flipping' in args.augmentation:
 pipeline = RandomPipeline()
 pipeline.register('resizing')
 pipeline.register('flipping')
-pipeline.register(*args.augmentation)
 v_dataset.add_pipeline(pipeline)
 
 # print datasets
