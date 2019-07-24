@@ -71,6 +71,7 @@ from torch.utils.data import DataLoader
 
 from dataset import DatasetFactory
 from dataset import Config as DatasetConfig
+from dataset.pipelines import RandomPipeline
 
 from pytorch_engine import Config as EngineConfig
 from pytorch_engine.training import BasicLogger, Printer, ModelSaver
@@ -146,17 +147,33 @@ else:
 ds_factory.add_training_operation('resizing')
 ds_factory.add_validation_operation('resizing')
 ds_factory.add_training_operation(*args.augmentation)
-
 t_dataset, v_dataset = ds_factory.create()
+
+if 'flipping' in args.augmentation:
+    augmentation = args.augmentation.copy()
+    augmentation.remove('flipping')
+    pipeline = RandomPipeline()
+    pipeline.register('resizing')
+    pipeline.register(*augmentation)
+    t_dataset.add_pipeline(pipeline)
+
+pipeline = RandomPipeline()
+pipeline.register('resizing')
+pipeline.register('flipping')
+pipeline.register(*args.augmentation)
+v_dataset.add_pipeline(pipeline)
+
 # print datasets
 print('-' * 80)
 print('training dataset')
+print('# training data', len(t_dataset))
 print(t_dataset)
 print('-' * 80)
 print('validation dataset')
+print('# validation data', len(v_dataset))
 print(v_dataset)
 
-t_loader = DataLoader(t_dataset, batch_size=args.batch_size,
+t_loader = DataLoader(t_dataset, batch_size=args.batch_size, shuffle=True,
                       num_workers=args.num_workers)
 
 if args.network_type == 'lr':
