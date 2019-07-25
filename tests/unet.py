@@ -9,8 +9,7 @@ import matplotlib.pyplot as plt
 from image_processing_3d import padcrop3d
 from pytorch_engine.funcs import count_trainable_paras
 
-from pytorch_reflection.unet import LRUNet, UNet
-
+from pytorch_reflection.unet import LRUNet, UNet, LRSegUNet
 
 
 def eval_net(net, name):
@@ -20,7 +19,7 @@ def eval_net(net, name):
     image = torch.from_numpy(image).float() # .cuda()
     flipped_image = image.flip(2)
 
-    # print(net)
+    print(net)
     print('# trainable parameters', count_trainable_paras(net))
     # output = net(image)
     # output_r = net(flipped_image)
@@ -60,6 +59,9 @@ num_trans_down = 5
 out_classes = 1
 net = LRUNet(1, out_classes, num_trans_down, first_channels) #.cuda().eval()
 eval_net(net, 'lr_unet')
+
+net = LRSegUNet(1, out_classes, num_trans_down, first_channels) #.cuda().eval()
+eval_net(net, 'lr_seg_unet')
 
 first_channels = 5
 net = UNet(1, out_classes, num_trans_down, first_channels) # .cuda().eval()

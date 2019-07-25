@@ -6,6 +6,7 @@ from pytorch_engine.layers import create_pool, create_proj
 from .blocks import LRInputBlock, LRContractingBlock, LRExpandingBlock
 from .blocks import create_LRF2I, LRTransUpBlock, TransUpBlock
 from .blocks import InputBlock, ContractingBlock, ExpandingBlock
+from .blocks import create_LRF2F_proj
 
 
 class _UNet(torch.nn.Module):
@@ -100,6 +101,11 @@ class LRUNet(_UNet):
 
     def _create_out(self, in_channels):
         return create_LRF2I(in_channels, self.out_classes)
+
+
+class LRSegUNet(LRUNet):
+    def _create_out(self, in_channels):
+        return create_LRF2F_proj(in_channels, self.out_classes)
 
 
 class UNet(_UNet):
