@@ -16,8 +16,8 @@ def eval_net(net, name):
 
     image = nib.load('image.nii.gz').get_data()
     # image = padcrop3d(image, (192, 256, 192))[0][None, None, ...]
-    image = padcrop3d(image, (128, 96, 96))[0][None, None, ...]
-    image = torch.from_numpy(image).float() # .cuda()
+    image = padcrop3d(image, (96, 96, 96))[0][None, None, ...]
+    image = torch.from_numpy(image).float().cuda()
     flipped_image = image.flip(2)
 
     # print(net)
@@ -34,8 +34,17 @@ def eval_net(net, name):
     # image = image.detach().cpu().numpy()
     # flipped_image = flipped_image.detach().cpu().numpy()
 
+    # print(output.shape)
+    # print(output_r.shape)
+
+    # nb, nc, x, y, z = output.shape
+    # output = output.reshape(nb, -1, 2, x, y, z)
+    # output = output[:, :, ::-1, ...]
+    # output = output.reshape(nb, nc, x, y, z)
     # diff = np.abs(output[:, :, ::-1, ...] - output_r)
+    # # diff = np.abs(output[:, 0, ::-1, ...] - output_r[:, 1, ...])
     # diff_r = diff / output_r
+    # # diff_r = diff / output_r[:, 1, ...]
     # diff_r = diff_r[np.logical_not(np.isnan(diff_r))]
 
     # slice_ind = image.shape[-1] // 2
@@ -43,13 +52,15 @@ def eval_net(net, name):
     # plt.subplot(3, 2, 1)
     # plt.imshow(image[0, 0, ..., slice_ind], cmap='gray')
     # plt.subplot(3, 2, 2)
-    # plt.imshow(output[0, 0, ..., slice_ind], cmap='gray')
+    # plt.imshow(output[0, 1, ..., slice_ind], cmap='gray')
+
     # plt.subplot(3, 2, 3)
     # plt.imshow(flipped_image[0, 0, ..., slice_ind], cmap='gray')
     # plt.subplot(3, 2, 4)
     # plt.imshow(output_r[0, 0, ...,  slice_ind], cmap='gray')
     # plt.subplot(3, 2, 5)
     # plt.imshow(diff[0, 0, ..., slice_ind])
+    # # plt.imshow(diff[0, ..., slice_ind])
     # text = 'max abs diff %.2e\nmax relative diff %.2e\noutput intensity [%.2e, %.2e]'
     # text = text %  (np.max(diff), np.max(diff_r), np.min(output), np.max(output))
     # plt.gcf().text(.5, .01, text, ha='center')
@@ -57,12 +68,8 @@ def eval_net(net, name):
 
 first_channels = 32
 num_trans_down = 5
-out_classes = 1
-net = LRUNet(1, out_classes, num_trans_down, first_channels) #.cuda().eval()
-eval_net(net, 'lr_unet')
-
-first_channels = 51
-net = UNet(1, out_classes, num_trans_down, first_channels) # .cuda().eval()
-eval_net(net, 'unet')
+out_classes = 18
+net = LRSegUNet(1, out_classes, num_trans_down, first_channels).cuda().eval()
+eval_net(net, 'lr_seg_unet')
 
 plt.show()

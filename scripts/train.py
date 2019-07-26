@@ -18,8 +18,7 @@ parser.add_argument('-v', '--validation-indices', nargs='+', default=[],
                     help=('The indicies of validation for each dataset, '
                           'comma separate'))
 parser.add_argument('-a', '--augmentation', nargs='+', default=list(),
-                    choices={'rotation', 'deformation', 'sigmoid_intensity',
-                             'scaling', 'flipping'},
+                    choices={'rotate', 'deform', 'scale', 'flip'},
                     help='Data augmentation methods; orders are preserved')
 parser.add_argument('-b', '--batch-size', type=int, default=1,
                     help='The number of images per batch')
@@ -50,7 +49,7 @@ parser.add_argument('-td', '--training-dir', nargs='+', default=[],
                     help='Training data directories')
 parser.add_argument('-vd', '--validation-dir', nargs='+', default=[],
                     help='Validation data directories')
-parser.add_argument('-t', '--network-type', choices={'normal', 'lr'},
+parser.add_argument('-t', '--network-type', choices={'normal', 'lr', 'lr-seg'},
                     default='lr', help='The type of the network.')
 parser.add_argument('-is', '--image-suffix', default='image',
                     help='The suffix of the image file.')
@@ -78,6 +77,7 @@ from torch.utils.data import DataLoader
 from dataset import DatasetFactory
 from dataset import Config as DatasetConfig
 from dataset.pipelines import RandomPipeline
+from dataset.workers import WorkerCreator
 
 from pytorch_engine import Config as EngineConfig
 from pytorch_engine.training import BasicLogger, Printer, ModelSaver
@@ -85,6 +85,8 @@ from pytorch_engine.training import SimpleTrainer, SimpleValidator
 from pytorch_engine.training import PredictionSaver
 from pytorch_engine.funcs import count_trainable_paras
 from pytorch_engine.loss import create_loss
+
+from pytorch_reflection.worker import LabelReorderer
 
 
 # set configurations
@@ -125,6 +127,10 @@ dataset_config.image_suffixes = [args.image_suffix]
 dataset_config.label_suffixes = [args.label_suffix]
 dataset_config.mask_suffixes = [args.mask_suffix]
 
+worker_name = 'reorder_label'
+dataset_config.worker_types['addon'].append(worker_name)
+WorkerCreator().register(worker_name, LabelReorderer)
+print(WorkerCreator())
 
 # load datasets
 ds_factory = DatasetFactory()
@@ -153,22 +159,45 @@ elif args.training_dir:
 else:
     raise RuntimeError('input-dir or train-dir should not be empty')
 
-ds_factory.add_training_operation('resizing')
-ds_factory.add_validation_operation('resizing')
+ds_factory.add_training_operation('resize')
+ds_factory.add_validation_operation('resize')
 ds_factory.add_training_operation(*args.augmentation)
+if args.cropping_shape is not None:
+    ds_factory.add_training_operation('crop')
+    ds_factory.add_validation_operation('crop')
+
+if args.network_type == 'lr-seg':
+    ds_factory.add_training_operation('reorder_label')
+    ds_factory.add_validation_operation('reorder_label')
+else:
+    ds_factory.add_training_operation('norm_label')
+    ds_factory.add_validation_operation('norm_label')
+
 t_dataset, v_dataset = ds_factory.create()
 
-if 'flipping' in args.augmentation:
+if 'flip' in args.augmentation:
     augmentation = args.augmentation.copy()
-    augmentation.remove('flipping')
+    augmentation.remove('flip')
     pipeline = RandomPipeline()
-    pipeline.register('resizing')
+    pipeline.register('resize')
     pipeline.register(*augmentation)
+    if args.cropping_shape is not None:
+        pipeline.register('crop')
+    if args.network_type == 'lr-seg':
+        pipeline.register('reorder_label')
+    else:
+        pipeline.register('norm_label')
     t_dataset.add_pipeline(pipeline)
 
 pipeline = RandomPipeline()
-pipeline.register('resizing')
-pipeline.register('flipping')
+pipeline.register('resize')
+pipeline.register('flip')
+if args.cropping_shape is not None:
+    pipeline.register('crop')
+if args.network_type == 'lr-seg':
+    pipeline.register('reorder_label')
+else:
+    pipeline.register('norm_label')
 v_dataset.add_pipeline(pipeline)
 
 # print datasets
@@ -186,10 +215,20 @@ t_loader = DataLoader(t_dataset, batch_size=args.batch_size, shuffle=True,
 
 if args.network_type == 'lr':
     from pytorch_reflection.unet import LRUNet as Net
-else:
+elif args.network_type == 'normal':
     from pytorch_reflection.unet import UNet as Net
+else:
+    from pytorch_reflection.unet import LRSegUNet as Net
 
-out_classes = len(t_dataset.labels)
+
+if args.network_type == 'lr-seg':
+    pairs = t_dataset.images[0][1].pairs
+    num_pairs = len(pairs)
+    out_classes = len(t_dataset.labels) - num_pairs
+    print(out_classes)
+else:
+    out_classes = len(t_dataset.labels)
+
 if out_classes == 2:
     out_classes -= 1
 net = Net(1, out_classes, args.depth, args.width).cuda()
@@ -205,7 +244,15 @@ print('#paras:', count_trainable_paras(net))
 print('-' * 80)
 
 # loss and optim
-loss_func = create_loss()
+# loss_func = create_loss()
+
+if args.network_type == 'lr-seg':
+    from pytorch_reflection.loss import DiceLoss
+else:
+    from pytorch_engine.loss import DiceLoss
+loss_func = DiceLoss()
+print(loss_func)
+
 lr = args.learning_rate * args.batch_size
 optimizer = Adam(net.parameters(), lr=lr)
 print(optimizer)
