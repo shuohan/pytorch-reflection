@@ -127,10 +127,10 @@ dataset_config.image_suffixes = [args.image_suffix]
 dataset_config.label_suffixes = [args.label_suffix]
 dataset_config.mask_suffixes = [args.mask_suffix]
 
-worker_name = 'reorder_label'
-dataset_config.worker_types['addon'].append(worker_name)
-WorkerCreator().register(worker_name, LabelReorderer)
-print(WorkerCreator())
+# worker_name = 'reorder_label'
+# dataset_config.worker_types['addon'].append(worker_name)
+# WorkerCreator().register(worker_name, LabelReorderer)
+# print(WorkerCreator())
 
 # load datasets
 ds_factory = DatasetFactory()
@@ -166,12 +166,12 @@ if args.cropping_shape is not None:
     ds_factory.add_training_operation('crop')
     ds_factory.add_validation_operation('crop')
 
-if args.network_type == 'lr-seg':
-    ds_factory.add_training_operation('reorder_label')
-    ds_factory.add_validation_operation('reorder_label')
-else:
-    ds_factory.add_training_operation('norm_label')
-    ds_factory.add_validation_operation('norm_label')
+# if args.network_type == 'lr-seg':
+#     ds_factory.add_training_operation('reorder_label')
+#     ds_factory.add_validation_operation('reorder_label')
+# else:
+ds_factory.add_training_operation('norm_label')
+ds_factory.add_validation_operation('norm_label')
 
 t_dataset, v_dataset = ds_factory.create()
 
@@ -183,10 +183,10 @@ if 'flip' in args.augmentation:
     pipeline.register(*augmentation)
     if args.cropping_shape is not None:
         pipeline.register('crop')
-    if args.network_type == 'lr-seg':
-        pipeline.register('reorder_label')
-    else:
-        pipeline.register('norm_label')
+    # if args.network_type == 'lr-seg':
+    #     pipeline.register('reorder_label')
+    # else:
+    pipeline.register('norm_label')
     t_dataset.add_pipeline(pipeline)
 
 pipeline = RandomPipeline()
@@ -194,10 +194,10 @@ pipeline.register('resize')
 pipeline.register('flip')
 if args.cropping_shape is not None:
     pipeline.register('crop')
-if args.network_type == 'lr-seg':
-    pipeline.register('reorder_label')
-else:
-    pipeline.register('norm_label')
+# if args.network_type == 'lr-seg':
+#     pipeline.register('reorder_label')
+# else:
+pipeline.register('norm_label')
 v_dataset.add_pipeline(pipeline)
 
 # print datasets
@@ -221,17 +221,15 @@ else:
     from pytorch_reflection.unet import LRSegUNet as Net
 
 
-if args.network_type == 'lr-seg':
-    pairs = t_dataset.images[0][1].pairs
-    num_pairs = len(pairs)
-    out_classes = len(t_dataset.labels) - num_pairs
-    print(out_classes)
-else:
-    out_classes = len(t_dataset.labels)
-
+out_classes = len(t_dataset.labels)
 if out_classes == 2:
     out_classes -= 1
-net = Net(1, out_classes, args.depth, args.width).cuda()
+if args.network_type == 'lr-seg':
+    label_image = t_dataset.images[0][1].normalize()
+    paired_labels = label_image.pairs
+    net = Net(1, out_classes, args.depth, args.width, paired_labels).cuda()
+else:
+    net = Net(1, out_classes, args.depth, args.width).cuda()
 
 if os.path.isfile(args.checkpoint):
     args.output_prefix += 'cont_'
@@ -244,14 +242,14 @@ print('#paras:', count_trainable_paras(net))
 print('-' * 80)
 
 # loss and optim
-# loss_func = create_loss()
+loss_func = create_loss()
 
-if args.network_type == 'lr-seg':
-    from pytorch_reflection.loss import DiceLoss
-else:
-    from pytorch_engine.loss import DiceLoss
-loss_func = DiceLoss()
-print(loss_func)
+# if args.network_type == 'lr-seg':
+#     from pytorch_reflection.loss import DiceLoss
+# else:
+#     from pytorch_engine.loss import DiceLoss
+# loss_func = DiceLoss()
+# print(loss_func)
 
 lr = args.learning_rate * args.batch_size
 optimizer = Adam(net.parameters(), lr=lr)

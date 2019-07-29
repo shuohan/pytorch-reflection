@@ -1,7 +1,10 @@
 # -*- coding: utf-8 -*-
   
+import numpy as np
 import torch
+import torch.nn.functional as F
 from pytorch_engine.layers import create_pool, create_proj
+from pytorch_engine import Config as EConfig
 
 from .blocks import LRInputBlock, LRContractingBlock, LRExpandingBlock
 from .blocks import create_LRF2I, LRTransUpBlock, TransUpBlock
@@ -103,9 +106,77 @@ class LRUNet(_UNet):
         return create_LRF2I(in_channels, self.out_classes)
 
 
+class LRSegOut(torch.nn.Module):
+    def __init__(self, in_channels, out_channels, paired_labels):
+        super().__init__()
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.paired_labels = paired_labels
+        self.single_labels = self._calc_single_labels()
+        self.conv = self._create_conv()
+        self.weight = torch.nn.Parameter(self._construct_weight())
+        # torch.set_printoptions(threshold=5000)
+        # print(self.weight.squeeze().int().data)
+        # print(torch.sum(self.weight.data, 0).squeeze().int().data)
+
+    def _calc_single_labels(self):
+        all_labels = set(np.arange(self.out_channels))
+        paired_labels = set(np.array(self.paired_labels).flatten())
+        return sorted(list(all_labels - paired_labels))
+
+    def _create_conv(self):
+        out_channels = (self.out_channels + len(self.single_labels)) // 2
+        return create_LRF2F_proj(self.in_channels, out_channels)
+
+    def _construct_weight(self):
+        in_channels = self.conv.out_channels * 2
+        tmp_weights = dict()
+        counter = 0
+        for label in self.single_labels:
+            weight = torch.zeros(1, in_channels)
+            weight[0, counter] = 1
+            weight[0, counter + 1] = 1
+            tmp_weights[label] = weight
+            counter = counter + 2
+        for label1, label2 in self.paired_labels:
+            weight1 = torch.zeros(1, in_channels)
+            weight2 = torch.zeros(1, in_channels)
+            weight1[0, counter] = 1
+            weight2[0, counter + 1] = 1
+            tmp_weights[label1] = weight1
+            tmp_weights[label2] = weight2
+            counter = counter + 2
+        weights = list()
+        for key in sorted(list(tmp_weights.keys())):
+            weights.append(tmp_weights[key])
+        weights = torch.cat(weights, dim=0)
+        if EConfig().dim == 2:
+            return weights[..., None, None]
+        elif EConfig().dim == 3:
+            return weights[..., None, None, None]
+
+    def extra_repr(self):
+        s = 'single={single_labels}, paired={paired_labels}'
+        return s.format(**self.__dict__)
+
+    def forward(self, input):
+        output = self.conv(input)
+        if EConfig().dim == 2:
+            return F.conv2d(output, self.weight)
+        elif EConfig().dim == 3:
+            return F.conv3d(output, self.weight)
+
+
 class LRSegUNet(LRUNet):
+
+    def __init__(self, in_channels, out_classes, num_trans_down,
+                 first_channels, paired_labels, max_channels=1024):
+        self.paired_labels = paired_labels
+        super().__init__(in_channels, out_classes, num_trans_down,
+                         first_channels, max_channels)
+
     def _create_out(self, in_channels):
-        return create_LRF2F_proj(in_channels, self.out_classes)
+        return LRSegOut(in_channels, self.out_classes, self.paired_labels)
 
 
 class UNet(_UNet):
