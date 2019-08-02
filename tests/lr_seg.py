@@ -72,7 +72,7 @@ def eval_net(net, name):
     # plt.gcf().text(.5, .01, text, ha='center')
 
 
-first_channels = 32
+first_channels = 22
 num_trans_down = 5
 ds_factory = DatasetFactory()
 ds_factory.add_image_type('label')
@@ -82,6 +82,7 @@ label_image = t_dataset.images[0][0].normalize()
 paired_labels = label_image.pairs
 labels = label_image.labels
 out_classes = len(labels)
+print(out_classes)
 # print(out_classes, labels)
 
 net = LRSegUNet(1, out_classes, num_trans_down, first_channels,

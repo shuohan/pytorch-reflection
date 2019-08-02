@@ -55,15 +55,15 @@ def eval_net(net, name):
     # plt.gcf().text(.5, .01, text, ha='center')
 
 
-first_channels = 24
+# first_channels = 24
 num_trans_down = 5
-out_classes = 18
-net = LRUNet(1, out_classes, num_trans_down, first_channels) #.cuda().eval()
-eval_net(net, 'lr_unet')
+# out_classes = 18
+# net = LRUNet(1, out_classes, num_trans_down, first_channels) #.cuda().eval()
+# eval_net(net, 'lr_unet')
 
-first_channels = 35
+first_channels = 31
 out_classes = 29
 net = UNet(1, out_classes, num_trans_down, first_channels) # .cuda().eval()
 eval_net(net, 'unet')
 
-plt.show()
+# plt.show()

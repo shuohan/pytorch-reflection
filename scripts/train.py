@@ -253,6 +253,9 @@ loss_func = create_loss()
 
 lr = args.learning_rate * args.batch_size
 optimizer = Adam(net.parameters(), lr=lr)
+if os.path.isfile(args.checkpoint):
+    print('load optimizer')
+    optimizer.load_state_dict(checkpoint['optimizer'])
 print(optimizer)
 
 num_batches = len(t_dataset) // args.batch_size \
