@@ -255,7 +255,9 @@ lr = args.learning_rate * args.batch_size
 optimizer = Adam(net.parameters(), lr=lr)
 if os.path.isfile(args.checkpoint):
     print('load optimizer')
+    print(optimizer.state[optimizer.param_groups[0]['params'][0]])
     optimizer.load_state_dict(checkpoint['optimizer'])
+    print(optimizer.state[optimizer.param_groups[0]['params'][0]])
 print(optimizer)
 
 num_batches = len(t_dataset) // args.batch_size \
