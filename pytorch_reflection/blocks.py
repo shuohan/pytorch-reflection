@@ -257,12 +257,14 @@ class _TransUpBlock(torch.nn.Module):
         self.conv = self._create_conv()
         self.norm = self._create_norm()
         self.activ = create_activ()
+        self.dp = create_dropout()
         self.up = create_interpolate(scale_factor=2)
 
     def forward(self, input):
         output = self.conv(input)
         output = self.norm(output)
         output = self.activ(output)
+        output = self.dp(output)
         output = self.up(output)
         return output
 
