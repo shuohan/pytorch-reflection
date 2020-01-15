@@ -6,58 +6,53 @@ from .norm import LRBatchNorm2d, LRBatchNorm3d
 from .norm import LRInstanceNorm2d, LRInstanceNorm3d
 
 import torch
-from pytorch_engine import Config as EConfig
-from pytorch_engine.layers import create_activ, create_dropout
-from pytorch_engine.layers import create_interpolate, create_norm
-from pytorch_engine.layers import create_three_conv, create_proj
+from pytorch_layers import Config as LConfig
+from pytorch_layers import Dim, NormName
+from pytorch_layers import create_activ, create_dropout
+from pytorch_layers import create_two_upsample, create_norm
+from pytorch_layers import create_k3_conv, create_k1_conv
 
 
 def create_LRI2F(in_channels, out_channels, **kwargs):
-    config = EConfig()
-    if config.dim == 2:
+    if LConfig.dim is Dim.TWO:
         return LRConvI2F2d(in_channels, out_channels, 3, padding=1, **kwargs)
-    elif config.dim == 3:
+    elif LConfig.dim is Dim.THREE:
         return LRConvI2F3d(in_channels, out_channels, 3, padding=1, **kwargs)
 
 
 def create_LRF2F(in_channels, out_channels, **kwargs):
-    config = EConfig()
-    if config.dim == 2:
+    if LConfig.dim is Dim.TWO:
         return LRConvF2F2d(in_channels, out_channels, 3, padding=1, **kwargs)
-    elif config.dim == 3:
+    elif LConfig.dim is Dim.THREE:
         return LRConvF2F3d(in_channels, out_channels, 3, padding=1, **kwargs)
 
 
 def create_LRF2F_proj(in_channels, out_channels, **kwargs):
-    config = EConfig()
-    if config.dim == 2:
+    if LConfig.dim is Dim.TWO:
         return LRConvF2F2d(in_channels, out_channels, 1, padding=0, **kwargs)
-    elif config.dim == 3:
+    elif LConfig.dim is Dim.THREE:
         return LRConvF2F3d(in_channels, out_channels, 1, padding=0, **kwargs)
 
 
 def create_LRF2I(in_channels, out_channels, **kwargs):
-    config = EConfig()
-    if config.dim == 2:
+    if LConfig.dim is Dim.TWO:
         return LRConvF2I2d(in_channels, out_channels, 1, padding=0, **kwargs)
-    elif config.dim == 3:
+    elif LConfig.dim is Dim.THREE:
         return LRConvF2I3d(in_channels, out_channels, 1, padding=0, **kwargs)
 
 
 def create_LR_norm(num_features):
-    config = EConfig()
-    paras = config.norm.copy()
-    paras.pop('name')
-    if config.dim == 2:
-        if config.norm['name'] == 'instance':
-            return LRInstanceNorm2d(num_features, **paras)
-        elif config.norm['name'] == 'batch':
-            return LRBatchNorm2d(num_features, **paras)
-    elif config.dim == 3:
-        if config.norm['name'] == 'instance':
-            return LRInstanceNorm3d(num_features, **paras)
-        elif config.norm['name'] == 'batch':
-            return LRBatchNorm3d(num_features, **paras)
+    kwargs = {k: v for k, v in LConfig.norm.items() if k != 'name'}
+    if LConfig.dim is Dim.TWO:
+        if LConfig.norm['name'] is NormName.INSTANCE:
+            return LRInstanceNorm2d(num_features, **kwargs)
+        elif LConfig.norm['name'] is NormName.BATCH:
+            return LRBatchNorm2d(num_features, **kwargs)
+    elif LConfig.dim is Dim.THREE:
+        if LConfig.norm['name'] is NormName.INSTANCE:
+            return LRInstanceNorm3d(num_features, **kwargs)
+        elif LConfig.norm['name'] is NormName.BATCH:
+            return LRBatchNorm3d(num_features, **kwargs)
 
 
 class _ConvBlock(torch.nn.Module):
@@ -89,7 +84,7 @@ class _LRConvBlock(_ConvBlock):
 
 class ConvBlock(_ConvBlock):
     def _create_conv(self):
-        return create_three_conv(self.in_channels, self.out_channels,bias=False)
+        return create_k3_conv(self.in_channels, self.out_channels,bias=False)
 
     def _create_norm(self):
         return create_norm(self.out_channels)
@@ -258,7 +253,7 @@ class _TransUpBlock(torch.nn.Module):
         self.norm = self._create_norm()
         self.activ = create_activ()
         self.dp = create_dropout()
-        self.up = create_interpolate(scale_factor=2)
+        self.up = create_two_upsample()
 
     def forward(self, input):
         output = self.conv(input)
@@ -278,7 +273,7 @@ class _TransUpBlock(torch.nn.Module):
 class TransUpBlock(_TransUpBlock):
 
     def _create_conv(self):
-        return create_proj(self.in_channels, self.out_channels, bias=False)
+        return create_k1_conv(self.in_channels, self.out_channels, bias=False)
 
     def _create_norm(self):
         return create_norm(self.out_channels)

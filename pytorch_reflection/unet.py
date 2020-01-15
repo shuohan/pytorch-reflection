@@ -3,8 +3,9 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
-from pytorch_engine.layers import create_pool, create_proj
-from pytorch_engine import Config as EConfig
+from pytorch_layers import create_two_avg_pool, create_k1_conv
+from pytorch_layers import Config as LConfig
+from pytorch_layers import Dim
 
 from .blocks import LRInputBlock, LRContractingBlock, LRExpandingBlock
 from .blocks import create_LRF2I, LRTransUpBlock, TransUpBlock
@@ -28,7 +29,7 @@ class _UNet(torch.nn.Module):
         for i in range(self.num_trans_down):
             out_channels = self._calc_out_channels(in_channels)
             inter_channels = (in_channels + out_channels) // 2
-            setattr(self, 'td%d'%(i), create_pool(2))
+            setattr(self, 'td%d'%(i), create_two_avg_pool())
             cb = self._create_cb(in_channels, out_channels, inter_channels)
             setattr(self, 'cb%d'%(i+1), cb)
             in_channels = out_channels
@@ -150,9 +151,9 @@ class LRSegOut(torch.nn.Module):
         for key in sorted(list(tmp_weights.keys())):
             weights.append(tmp_weights[key])
         weights = torch.cat(weights, dim=0)
-        if EConfig().dim == 2:
+        if LConfig.dim is Dim.TWO:
             return weights[..., None, None]
-        elif EConfig().dim == 3:
+        elif LConfig.dim is Dim.THREE:
             return weights[..., None, None, None]
 
     def extra_repr(self):
@@ -161,9 +162,9 @@ class LRSegOut(torch.nn.Module):
 
     def forward(self, input):
         output = self.conv(input)
-        if EConfig().dim == 2:
+        if LConfig.dim is Dim.TWO:
             return F.conv2d(output, self.weight)
-        elif EConfig().dim == 3:
+        elif LConfig.dim is Dim.THREE:
             return F.conv3d(output, self.weight)
 
 
@@ -193,4 +194,4 @@ class UNet(_UNet):
         return ExpandingBlock(in_channels, shortcut_channels, out_channels)
 
     def _create_out(self, in_channels):
-        return create_proj(in_channels, self.out_classes)
+        return create_k1_conv(in_channels, self.out_classes)
