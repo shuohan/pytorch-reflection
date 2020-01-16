@@ -114,6 +114,7 @@ class LRSegOut(torch.nn.Module):
         self.out_channels = out_channels
         self.paired_labels = paired_labels
         self.single_labels = self._calc_single_labels()
+        print(self.paired_labels, self.single_labels)
         self.conv = self._create_conv()
         self.weight = torch.nn.Parameter(self._construct_weight())
         # torch.set_printoptions(threshold=5000)

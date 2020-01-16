@@ -18,8 +18,10 @@ parser.add_argument('-a', '--augmentation', nargs='+', default=list(),
                     help='Data augmentation methods; orders are preserved')
 parser.add_argument('-f', '--flip', default=False, action='store_true',
                     help='Flip the data to augment.')
-parser.add_argument('-b', '--batch-size', type=int, default=1,
-                    help='The number of images per batch')
+parser.add_argument('-tb', '--training-batch-size', type=int, default=1,
+                    help='The number of images per training mini-batch')
+parser.add_argument('-vb', '--validation-batch-size', type=int, default=1,
+                    help='The number of images per validation mini-batch')
 parser.add_argument('-c', '--cropping-shape', nargs=3, type=int,
                     default=None, help='The shape of the cropped out region')
 parser.add_argument('-s', '--input-shape', nargs=3, type=int,
@@ -97,7 +99,8 @@ if os.path.isfile(args.checkpoint):
     checkpoint = torch.load(args.checkpoint)
     script_config = checkpoint['script_config']
     script_config['checkpoint'] = args.checkpoint
-    script_config['batch_size'] = args.batch_size
+    script_config['training_batch_size'] = args.training_batch_size
+    script_config['validation_batch_size'] = args.validation_batch_size
     script_config['num_workers'] = args.num_workers
     script_config['training_dir'] = args.training_dir
     script_config['validation_dir'] = args.validation_dir
@@ -176,7 +179,7 @@ def load_dataset(dirname, augmentation=[], flip=False):
     return dataset
 
 td = load_dataset(args.training_dir, args.augmentation, args.flip)
-vd = load_dataset(args.validation_dir)
+vd = load_dataset(args.validation_dir, flip=True)
 
 # print datasets
 print('-' * 80)
@@ -188,7 +191,6 @@ print('validation dataset')
 print('# validation data', len(vd))
 print(vd)
 
-print(list(td.labels.keys())[0])
 out_classes = len(list(td.labels.keys())[0].labels)
 if out_classes == 2:
     out_classes -= 1
@@ -202,7 +204,9 @@ else:
 
 
 if args.network_type == 'lr-seg':
-    paired_labels = list(td.labels.keys())[0].pairs
+    label_image = td.images[list(td.images.keys())[0]][1].normalize()
+    paired_labels = label_image.label_info.pairs
+    print(label_image.label_info)
     net = Net(1, out_classes, args.depth, args.width, paired_labels).cuda()
 else:
     net = Net(1, out_classes, args.depth, args.width).cuda()
@@ -221,16 +225,15 @@ print('-' * 80)
 loss_func = DiceLoss(average=False)
 print(loss_func)
 
-lr = args.learning_rate * args.batch_size
 optim = Adam(net.parameters(), lr=args.learning_rate)
 if os.path.isfile(args.checkpoint):
     print('load optimizer')
     optim.load_state_dict(checkpoint['optim'])
 print(optim)
 
-tl = DataLoader(td, batch_size=args.batch_size, shuffle=True,
+tl = DataLoader(td, batch_size=args.training_batch_size, shuffle=True,
                 num_workers=args.num_workers)
-vl = DataLoader(vd, batch_size=args.batch_size, shuffle=False,
+vl = DataLoader(vd, batch_size=args.validation_batch_size, shuffle=False,
                 num_workers=args.num_workers)
 
 trainer = BasicTrainer(net, loss_func, optim, tl)

@@ -7,7 +7,7 @@ import nibabel as nib
 import numpy as np
 import matplotlib.pyplot as plt
 from image_processing_3d import padcrop3d
-from pytorch_engine.funcs import count_trainable_paras
+from pytorch_trainer.funcs import count_trainable_paras
 
 from pytorch_reflection.unet import LRUNet, UNet, LRSegUNet
 
