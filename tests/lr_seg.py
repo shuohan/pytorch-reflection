@@ -10,16 +10,19 @@ from image_processing_3d import padcrop3d
 from pytorch_trainer.funcs import count_trainable_paras
 
 from pytorch_reflection.unet import LRUNet, UNet, LRSegUNet
-from dataset import DatasetCreator
+from dataset import DatasetCreator, Config
 
 
 def eval_net(net, name):
 
-    image = nib.load('image.nii.gz').get_data()
+    chid = 3
+
+    image = nib.load('../scripts/training_ma/1000_image.nii.gz').get_data()
     # image = padcrop3d(image, (192, 256, 192))[0][None, None, ...]
-    image = padcrop3d(image, (192, 256, 192))[0][None, None, ...]
+    # image = padcrop3d(image, (192, 256, 192))[0][None, None, ...]
+    image = padcrop3d(image, (96, 96, 96))[0][None, None, ...]
     # image = padcrop3d(image, (96, 96, 96))[0][None, None, ...]
-    image = torch.from_numpy(image).float().cuda()
+    image = torch.from_numpy(image.astype(np.float32)).cuda()
     flipped_image = image.flip(2)
 
     print(net)
@@ -53,31 +56,38 @@ def eval_net(net, name):
     diff = np.concatenate((single_diff, paired_diff), axis=1)
     print(diff.shape)
     diff_r = diff / output_r
-    diff_r = diff_r[np.logical_not(np.isnan(diff_r))]
+    diff_r[np.isnan(diff_r)] = 0
+    diff = np.abs(diff)
+    diff_r = np.abs(diff_r)
 
     slice_ind = image.shape[-1] // 2
     plt.figure()
     plt.subplot(3, 2, 1)
     plt.imshow(image[0, 0, ..., slice_ind], cmap='gray')
     plt.subplot(3, 2, 2)
-    plt.imshow(output[0, 1, ..., slice_ind], cmap='gray')
+    plt.imshow(output[0, chid, ..., slice_ind], cmap='gray')
 
     plt.subplot(3, 2, 3)
     plt.imshow(flipped_image[0, 0, ..., slice_ind], cmap='gray')
     plt.subplot(3, 2, 4)
-    plt.imshow(output_r[0, 0, ...,  slice_ind], cmap='gray')
+    plt.imshow(output_r[0, chid, ...,  slice_ind], cmap='gray')
+
     plt.subplot(3, 2, 5)
-    plt.imshow(diff[0, 0, ..., slice_ind])
+    plt.imshow(diff[0, chid, ..., slice_ind])
     text = 'max abs diff %.2e\nmax relative diff %.2e\noutput intensity [%.2e, %.2e]'
     text = text %  (np.max(diff), np.max(diff_r), np.min(output), np.max(output))
     plt.gcf().text(.5, .01, text, ha='center')
 
+    plt.subplot(3, 2, 6)
+    plt.imshow(diff_r[0, chid, ..., slice_ind])
 
-first_channels = 22
+
+Config.label_suffixes = ['subcortical']
+first_channels = 24
 num_trans_down = 5
 creator = DatasetCreator()
 creator.add_image_type('label')
-creator.add_dataset(dirname='../scripts/training_tmc')
+creator.add_dataset(dirname='../scripts/training_ma')
 td = creator.create().dataset
 label_image = td.images[list(td.images.keys())[0]][0].normalize()
 labels = label_image.label_info.labels
@@ -88,6 +98,8 @@ print(out_classes)
 
 net = LRSegUNet(1, out_classes, num_trans_down, first_channels,
                 paired_labels).cuda().eval()
+cp = torch.load('../scripts/1116_sub/checkpoint_800.pt')
+net.load_state_dict(cp['model'])
 
 eval_net(net, 'lr_seg_unet')
 # 
