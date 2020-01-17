@@ -64,6 +64,7 @@ parser.add_argument('-pp', '--pred-period', type=int, default=1,
                     help='Save the prediction every this number of epochs')
 parser.add_argument('-ss', '--separate-samples', default=False,
                     action='store_true', help='Print loss separately')
+parser.add_argument('-do', '--dropout', default=0.2, type=float)
 
 args = parser.parse_args()
 
@@ -97,32 +98,33 @@ from pytorch_metrics import DiceLoss
 # set configurations
 if os.path.isfile(args.checkpoint):
     checkpoint = torch.load(args.checkpoint)
-    script_config = checkpoint['script_config']
-    script_config['checkpoint'] = args.checkpoint
-    script_config['training_batch_size'] = args.training_batch_size
-    script_config['validation_batch_size'] = args.validation_batch_size
-    script_config['num_workers'] = args.num_workers
-    script_config['training_dir'] = args.training_dir
-    script_config['validation_dir'] = args.validation_dir
-    script_config['output_prefix'] = args.output_prefix
-    for key, value in script_config.items():
-        setattr(args, key, value)
+    # script_config = checkpoint['script_config']
+    # script_config['checkpoint'] = args.checkpoint
+    # script_config['training_batch_size'] = args.training_batch_size
+    # script_config['validation_batch_size'] = args.validation_batch_size
+    # script_config['num_workers'] = args.num_workers
+    # script_config['training_dir'] = args.training_dir
+    # script_config['validation_dir'] = args.validation_dir
+    # script_config['output_prefix'] = args.output_prefix
+    # for key, value in script_config.items():
+    #     setattr(args, key, value)
 
-    TConfig.load_dict(checkpoint['trainer_config'])
+    print(checkpoint.keys())
+    TConfig.load_dict(checkpoint['tainer_config'])
     TConfig.num_epochs = args.num_epochs
     TConfig.model_period = args.model_period
     TConfig.pred_period = args.pred_period
     TConfig.val_period = args.val_period
 
-    DConfig.load_dict(checkpoint['dataset_config'])
-    LConfig.load_dict(checkpoint['layers_config'])
+    # DConfig.load_dict(checkpoint['dataset_config'])
+    # LConfig.load_dict(checkpoint['layers_config'])
 else:
     script_config = args.__dict__
 
 print('Script config')
-keylen = max([len(key)+1 for key in script_config.keys()])
-for key, value in script_config.items():
-    print('    %s %s' % ((key+':').ljust(keylen), value))
+# keylen = max([len(key)+1 for key in script_config.keys()])
+# for key, value in script_config.items():
+#     print('    %s %s' % ((key+':').ljust(keylen), value))
 
 DConfig.verbose = args.verbose
 DConfig.aug_prob = args.augmentation_prob
@@ -135,6 +137,7 @@ print('Dataset config')
 DConfig.show()
 print('-----------')
 
+LConfig.dropout = args.dropout
 print('Layers config')
 LConfig.show()
 print('-----------')
