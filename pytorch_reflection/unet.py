@@ -117,6 +117,7 @@ class LRSegOut(torch.nn.Module):
         print(self.paired_labels, self.single_labels)
         self.conv = self._create_conv()
         self.weight = torch.nn.Parameter(self._construct_weight())
+        self.weight.requires_grad = False
         # torch.set_printoptions(threshold=5000)
         # print(self.weight.squeeze().int().data)
         # print(torch.sum(self.weight.data, 0).squeeze().int().data)
@@ -163,6 +164,7 @@ class LRSegOut(torch.nn.Module):
 
     def forward(self, input):
         output = self.conv(input)
+        print(self.weight.requires_grad)
         if LConfig.dim is Dim.TWO:
             return F.conv2d(output, self.weight)
         elif LConfig.dim is Dim.THREE:
