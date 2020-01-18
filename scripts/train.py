@@ -98,33 +98,33 @@ from pytorch_metrics import DiceLoss
 # set configurations
 if os.path.isfile(args.checkpoint):
     checkpoint = torch.load(args.checkpoint)
-    # script_config = checkpoint['script_config']
-    # script_config['checkpoint'] = args.checkpoint
-    # script_config['training_batch_size'] = args.training_batch_size
-    # script_config['validation_batch_size'] = args.validation_batch_size
-    # script_config['num_workers'] = args.num_workers
-    # script_config['training_dir'] = args.training_dir
-    # script_config['validation_dir'] = args.validation_dir
-    # script_config['output_prefix'] = args.output_prefix
-    # for key, value in script_config.items():
-    #     setattr(args, key, value)
+    script_config = checkpoint['script_config']
+    script_config['checkpoint'] = args.checkpoint
+    script_config['training_batch_size'] = args.training_batch_size
+    script_config['validation_batch_size'] = args.validation_batch_size
+    script_config['num_workers'] = args.num_workers
+    script_config['training_dir'] = args.training_dir
+    script_config['validation_dir'] = args.validation_dir
+    script_config['output_prefix'] = args.output_prefix
+    for key, value in script_config.items():
+        setattr(args, key, value)
 
     print(checkpoint.keys())
-    TConfig.load_dict(checkpoint['tainer_config'])
+    TConfig.load_dict(checkpoint['trainer_config'])
     TConfig.num_epochs = args.num_epochs
     TConfig.model_period = args.model_period
     TConfig.pred_period = args.pred_period
     TConfig.val_period = args.val_period
 
-    # DConfig.load_dict(checkpoint['dataset_config'])
-    # LConfig.load_dict(checkpoint['layers_config'])
+    DConfig.load_dict(checkpoint['dataset_config'])
+    LConfig.load_dict(checkpoint['layers_config'])
 else:
     script_config = args.__dict__
 
 print('Script config')
-# keylen = max([len(key)+1 for key in script_config.keys()])
-# for key, value in script_config.items():
-#     print('    %s %s' % ((key+':').ljust(keylen), value))
+keylen = max([len(key)+1 for key in script_config.keys()])
+for key, value in script_config.items():
+    print('    %s %s' % ((key+':').ljust(keylen), value))
 
 DConfig.verbose = args.verbose
 DConfig.aug_prob = args.augmentation_prob
@@ -242,7 +242,9 @@ vl = DataLoader(vd, batch_size=args.validation_batch_size, shuffle=False,
 trainer = BasicTrainer(net, loss_func, optim, tl)
 tlogger = Logger(args.output_prefix + 'training.csv')
 tprinter = Printer('training')
-ms = ModelSaver(args.output_prefix)
+ms = ModelSaver(args.output_prefix, script_config=script_config,
+                dataset_config=DConfig.save_dict(),
+                layers_config=LConfig.save_dict())
 tp = SegPredSaver(args.output_prefix + 'tra')
 trainer.register_observer(tlogger)
 trainer.register_observer(tprinter)
